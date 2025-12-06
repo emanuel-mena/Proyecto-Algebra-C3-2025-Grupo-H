@@ -1,167 +1,296 @@
+# streamlit_app.py
 import numpy as np
+import pandas as pd
+import streamlit as st
+
+from perceptron import min_max_normalize, entrenar_perceptron, activation
+
+st.set_page_config(page_title="Perceptrón Dinámico", layout="wide")
+
+st.title("🧠 Perceptrón Dinámico con Normalización Min–Max")
+st.write(
+    """
+Interfaz gráfica para jugar con un perceptrón de **cualquier número de características (x₁...xₙ)**  
+Usa el módulo `perceptron.py` (entrenamiento por épocas) con una UI mucho más cómoda.
+"""
+)
 
 # ===========================================================
-# FUNCIÓN DE NORMALIZACIÓN MIN–MAX (para cualquier n)
+# SECCIÓN 1: DEFINICIÓN DEL CONJUNTO DE ENTRENAMIENTO
 # ===========================================================
-def min_max_normalize(X):
-    X_min = X.min(axis=0)
-    X_max = X.max(axis=0)
-    X_norm = (X - X_min) / (X_max - X_min)
-    return X_norm, X_min, X_max
+st.header("Datos de entrenamiento")
 
-
-# ===========================================================
-# ACTIVACIÓN DEL PERCEPTRÓN
-# ===========================================================
-def activation(z):
-    return 1 if z >= 0 else 0
-
-
-# ===========================================================
-# INGRESO DINÁMICO DE DATOS
-# (cualquier cantidad de variables x1...xn)
-# ===========================================================
-def ingresar_datos():
-    print("\n=== INGRESO DE DATOS DEL PERCEPTRÓN ===")
-    
-    n = int(input("¿Cuántas características (X) tendrá cada patrón?: "))
-    X = []
-    y = []
-
-    while True:
-        continuar = input("\n¿Desea ingresar un nuevo patrón? (s/n): ").lower()
-        if continuar == "n":
-            break
-
-        print(f"Ingrese los {n} valores del patrón:")
-        x = [float(input(f"  x{i+1}: ")) for i in range(n)]
-
-        salida = int(input("Valor deseado (y = 0 o 1): "))
-
-        X.append(x)
-        y.append(salida)
-
-    return np.array(X, dtype=float), np.array(y, dtype=int), n
-
-
-# ===========================================================
-# ENTRENAMIENTO GENERAL DEL PERCEPTRÓN
-# ===========================================================
-def entrenar_perceptron(X, y, w, b, eta, max_iter):
-    historial = []
-
-    for epoch in range(1, max_iter + 1):
-        print(f"\n=========== ITERACIÓN {epoch} ===========")
-        errores_epoch = 0
-        registros = []
-
-        for i in range(len(X)):
-            x_i = X[i]
-            y_real = y[i]
-
-            z = np.dot(w, x_i) + b
-            y_pred = activation(z)
-            error = y_real - y_pred
-
-            # Actualización
-            w = w + eta * error * x_i
-            b = b + eta * error
-
-            registros.append({
-                "patron": i + 1,
-                "z": z,
-                "pred": y_pred,
-                "error": error
-            })
-
-            print(f"Patrón {i+1}: z={z:.4f}, pred={y_pred}, error={error}")
-            print(f"   w={np.round(w,3)}, b={round(b,3)}")
-
-            if error != 0:
-                errores_epoch += 1
-
-        historial.append({
-            "iter": epoch,
-            "w": w.copy(),
-            "b": b,
-            "errores": errores_epoch,
-            "registros": registros
-        })
-
-        if errores_epoch == 0:
-            print("\n>>> EL MODELO CONVERGIÓ <<<")
-            break
-
-    return w, b, historial
-
-
-# ===========================================================
-# VALIDACIÓN DEL MODELO (cualquier n)
-# ===========================================================
-def validar_modelo(X_min, X_max, w, b):
-    print("\n===== VALIDACIÓN DE NUEVOS DATOS =====")
-
-    n = len(w)
-
-    while True:
-        cont = input("\n¿Desea validar un nuevo dato? (s/n): ").lower()
-        if cont == "n":
-            break
-
-        print(f"Ingrese {n} valores para el nuevo dato:")
-        x = np.array([float(input(f"x{i+1}: ")) for i in range(n)], dtype=float)
-
-        # Normalizar usando min y max originales
-        x_norm = (x - X_min) / (X_max - X_min)
-        x_norm = np.round(x_norm, 2)
-
-        z = np.dot(w, x_norm) + b
-        pred = activation(z)
-
-        print(f"Normalizado: {x_norm}, z={z:.3f}, predicción={pred}")
-
-
-# ===========================================================
-# PROGRAMA PRINCIPAL
-# ===========================================================
-def main():
-    print("=== PERCEPTRÓN DINÁMICO CON NORMALIZACIÓN ===")
-
-    # 1. Ingreso de datos
-    X_raw, y, n = ingresar_datos()
-
-    # 2. Normalizar
-    X_norm, X_min, X_max = min_max_normalize(X_raw)
-    X_norm = np.round(X_norm, 2)
-
-    print("\nDatos normalizados:")
-    print(X_norm)
-
-    # 3. Pedir pesos iniciales dinámicos
-    print("\n=== PARÁMETROS DEL MODELO ===")
-    print(f"Debe ingresar {n} pesos iniciales (para x1 ... x{n})")
-
-    w = np.array([float(input(f"Peso w{i+1}: ")) for i in range(n)], dtype=float)
-    b = float(input("Sesgo inicial b: "))
-    eta = float(input("Tasa de aprendizaje (eta): "))
-    max_iter = int(input("Máximo de iteraciones: "))
-
-    # 4. Entrenar
-    w_final, b_final, historial = entrenar_perceptron(
-        X_norm, y, w, b, eta, max_iter
+col_n, col_hint = st.columns([1, 3])
+with col_n:
+    n_features = st.number_input(
+        "Número de características (X) por patrón",
+        min_value=1,
+        max_value=10,
+        value=2,
+        step=1,
     )
 
-    # 5. Mostrar resumen
-    print("\n===== EVOLUCIÓN POR ITERACIÓN =====")
-    for h in historial:
-        print(f"Iter {h['iter']}: w={np.round(h['w'],3)}, b={h['b']}, errores={h['errores']}")
+with col_hint:
+    st.info(
+        "Cada fila será un patrón de entrenamiento. Las columnas `x1...xn` son las características "
+        "y la columna `y` es la salida deseada (0 o 1). Puedes agregar/eliminar filas."
+    )
 
-    # 6. Validación
-    validar_modelo(X_min, X_max, w_final, b_final)
+# Crear/actualizar DataFrame en sesión
+if "df_train" not in st.session_state or st.session_state.get("df_train_n") != n_features:
+    cols = [f"x{i+1}" for i in range(n_features)] + ["y"]
+    data = [
+        [0.0] * n_features + [0],
+        [1.0] * n_features + [1],
+    ]
+    st.session_state.df_train = pd.DataFrame(data, columns=cols)
+    st.session_state.df_train_n = n_features
 
-    print("\n=== FIN DEL PROGRAMA ===")
+df_train = st.data_editor(
+    st.session_state.df_train,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="data_editor_train",
+)
+st.session_state.df_train = df_train  # guardar cambios
 
 
-# Ejecutar
-if __name__ == "__main__":
-    main()
+def preparar_datos(df, n_features: int):
+    """Convierte el DataFrame a X (float) e y (int), validando NaNs."""
+    if df.empty:
+        st.error("⚠ Debes tener al menos un patrón de entrenamiento.")
+        return None, None
+
+    required_cols = [f"x{i+1}" for i in range(n_features)] + ["y"]
+    for c in required_cols:
+        if c not in df.columns:
+            st.error(f"Falta la columna `{c}` en la tabla de datos.")
+            return None, None
+
+    # Eliminar filas completamente vacías
+    df_clean = df.dropna(how="all")
+    if df_clean.empty:
+        st.error("⚠ Todos los patrones están vacíos.")
+        return None, None
+
+    # Verificar NaNs en las columnas necesarias
+    if df_clean[required_cols].isna().any().any():
+        st.error("⚠ No puede haber valores vacíos (NaN) en X o en y.")
+        return None, None
+
+    X = df_clean[[f"x{i+1}" for i in range(n_features)]].astype(float).to_numpy()
+    y = df_clean["y"].astype(int).to_numpy()
+
+    # Verificar que y solo contenga 0 o 1
+    if not np.isin(y, [0, 1]).all():
+        st.error("⚠ La columna y solo puede contener 0 o 1.")
+        return None, None
+
+    return X, y
+
+
+# ===========================================================
+# SECCIÓN 2: HIPERPARÁMETROS DEL PERCEPTRÓN
+# ===========================================================
+st.header("Parámetros del modelo")
+
+col_left, col_right = st.columns(2)
+
+with col_left:
+    init_mode = st.selectbox(
+        "Inicialización de pesos",
+        options=["Ceros", "Aleatorios N(0,1)"],
+        index=0,
+    )
+
+    b_init = st.number_input("Sesgo inicial (b)", value=0.0, step=0.1)
+
+with col_right:
+    eta = st.number_input(
+        "Tasa de aprendizaje (η)",
+        min_value=0.0001,
+        max_value=1.0,
+        value=0.1,
+        step=0.01,
+    )
+    max_iter = st.number_input(
+        "Máximo de iteraciones (épocas)",
+        min_value=1,
+        max_value=10_000,
+        value=20,
+        step=1,
+    )
+
+# ===========================================================
+# SECCIÓN 3: ENTRENAR EL MODELO
+# ===========================================================
+st.header("Entrenar perceptrón")
+
+train_button = st.button("🚀 Entrenar", type="primary")
+
+if train_button:
+    X_raw, y = preparar_datos(df_train, n_features)
+    if X_raw is not None:
+        # Normalizar
+        X_norm, X_min, X_max = min_max_normalize(X_raw)
+        X_norm = np.round(X_norm, 2)
+
+        st.subheader("Datos normalizados (Min–Max)")
+        st.dataframe(
+            pd.DataFrame(
+                X_norm,
+                columns=[f"x{i+1}" for i in range(n_features)],
+            ),
+            use_container_width=True,
+        )
+
+        # Inicializar pesos
+        if init_mode == "Ceros":
+            w_init = np.zeros(n_features, dtype=float)
+        else:
+            w_init = np.random.randn(n_features).astype(float)
+
+        st.write("Pesos iniciales:", w_init)
+        st.write("Sesgo inicial:", b_init)
+
+        # Entrenar usando la función de tu módulo
+        with st.spinner("Entrenando perceptrón..."):
+            w_final, b_final, historial = entrenar_perceptron(
+                X_norm, y, w_init, b_init, eta, int(max_iter)
+            )
+
+        # Guardar en sesión para poder validar luego
+        st.session_state.trained = True
+        st.session_state.X_min = X_min
+        st.session_state.X_max = X_max
+        st.session_state.w_final = w_final
+        st.session_state.b_final = b_final
+        st.session_state.historial = historial
+        st.session_state.n_features = n_features
+
+        st.success("✅ Entrenamiento completado")
+
+        # ---------- RESUMEN POR ÉPOCA ----------
+        st.subheader("Resumen por iteración (época)")
+        resumen_data = []
+        for h in historial:
+            resumen_data.append(
+                {
+                    "Iteración": h["iter"],
+                    "Errores": h["errores"],
+                    "w": np.round(h["w"], 3),
+                    "b": round(h["b"], 3),
+                }
+            )
+        st.dataframe(pd.DataFrame(resumen_data), use_container_width=True)
+
+        # Evolución de errores
+        st.subheader("Evolución de errores por iteración")
+        errores_por_iter = pd.DataFrame(
+            {
+                "iter": [h["iter"] for h in historial],
+                "errores": [h["errores"] for h in historial],
+            }
+        ).set_index("iter")
+        st.line_chart(errores_por_iter)
+
+        # ---------- TABLA DETALLADA PARA EL INFORME ----------
+        st.subheader("Tabla detallada (para el informe)")
+
+        # Construimos una sola tabla con TODAS las actualizaciones
+        filas = []
+        for h in historial:
+            iter_idx = h["iter"]
+            for r in h["registros"]:
+                fila = {
+                    "Iteración": iter_idx,
+                    "Patrón": r["patron"],
+                    "z": r["z"],
+                    "ŷ": r["pred"],
+                    "Error": r["error"],
+                    "b": r["b"],
+                }
+                # Expandir vector de pesos en columnas w1...wn
+                w_vec = np.array(r["w"], dtype=float)
+                for j, val in enumerate(w_vec):
+                    fila[f"w{j+1}"] = val
+                filas.append(fila)
+
+        df_full_log = pd.DataFrame(filas)
+
+        st.dataframe(df_full_log, use_container_width=True)
+
+        # Botón para descargar como CSV (para pegar en Excel/Word/LaTeX)
+        csv_bytes = df_full_log.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="💾 Descargar tabla completa (CSV)",
+            data=csv_bytes,
+            file_name="perceptron_entrenamiento_detalle.csv",
+            mime="text/csv",
+        )
+
+        # Detalle por época en un expander (si querés verlo separado)
+        with st.expander("🔎 Ver detalle por época"):
+            for h in historial:
+                st.markdown(f"#### Iteración {h['iter']}")
+                filas_epoch = []
+                for r in h["registros"]:
+                    fila = {
+                        "Patrón": r["patron"],
+                        "z": r["z"],
+                        "ŷ": r["pred"],
+                        "Error": r["error"],
+                        "b": r["b"],
+                    }
+                    w_vec = np.array(r["w"], dtype=float)
+                    for j, val in enumerate(w_vec):
+                        fila[f"w{j+1}"] = val
+                    filas_epoch.append(fila)
+                df_regs = pd.DataFrame(filas_epoch)
+                st.dataframe(df_regs, use_container_width=True)
+
+        st.subheader("Parámetros finales del modelo")
+        st.write("w_final:", np.round(w_final, 3))
+        st.write("b_final:", round(b_final, 3))
+
+# ===========================================================
+# SECCIÓN 4: VALIDACIÓN DE NUEVOS DATOS
+# ===========================================================
+st.header("Validar nuevos datos")
+
+if not st.session_state.get("trained", False):
+    st.info("⚠ Entrena el modelo primero para poder validar nuevos datos.")
+else:
+    X_min = st.session_state.X_min
+    X_max = st.session_state.X_max
+    w_final = st.session_state.w_final
+    b_final = st.session_state.b_final
+    n_features = st.session_state.n_features
+
+    st.write(
+        "Introduce un nuevo vector x = (x₁...xₙ) en la **escala original**. "
+        "Se normalizará automáticamente usando los min/max del conjunto de entrenamiento."
+    )
+
+    cols_inputs = st.columns(n_features)
+    x_new = np.zeros(n_features, dtype=float)
+    for i in range(n_features):
+        with cols_inputs[i]:
+            x_new[i] = st.number_input(
+                f"x{i+1} (nuevo)",
+                value=0.0,
+                key=f"x_new_{i}",
+            )
+
+    if st.button("📌 Validar nuevo patrón"):
+        # Normalizar usando min y max originales
+        x_norm = (x_new - X_min) / (X_max - X_min)
+        x_norm = np.round(x_norm, 2)
+
+        z = np.dot(w_final, x_norm) + b_final
+        pred = activation(z)
+
+        st.write("Vector original:", x_new)
+        st.write("Vector normalizado:", x_norm)
+        st.write(f"z = {z:.4f}")
+        st.success(f"Predicción del perceptrón: **{pred}** (0 = rechazo, 1 = aceptación)")
