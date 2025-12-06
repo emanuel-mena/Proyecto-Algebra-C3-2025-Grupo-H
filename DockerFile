@@ -1,0 +1,26 @@
+# ---- Runtime ----
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Paquetes de sistema (por si alguna lib de Python necesita compilar)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar dependencias
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código de la app
+COPY . /app/
+
+# Streamlit por defecto corre en el 8501
+ENV PORT=8501
+EXPOSE 8501
+
+# Comando de inicio
+CMD ["sh", "-c", "streamlit run main.py --server.port ${PORT:-8501} --server.address 0.0.0.0"]
